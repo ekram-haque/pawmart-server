@@ -30,33 +30,33 @@ async function run() {
     const db = client.db("pawmart_db");
     const productsCollection = db.collection("products");
     const myProductCollection = db.collection("myProduct");
-    // const usersCollection = db.collection('user');
+    const ordersCollection = db.collection("myorders");
 
-    // // user details
+    // POST: Save order info to MongoDB
+    app.post("/orders", async (req, res) => {
+      const order = req.body;
+      try {
+        const result = await ordersCollection.insertOne(order);
+        res.send(result);
+      } catch (error) {
+        console.error("Error saving order:", error);
+        res.status(500).send({ message: "Failed to save order" });
+      }
+    });
 
-    //   //  Get user info
-    //     app.get("/user/:email", async (req, res) => {
-    //       const email = req.params.email;
-    //       const user = await usersCollection.findOne({ email });
-    //       res.send(user || {});
-    //     });
+// GET: fetch orders of logged-in user
+app.get("/my-orders", async (req, res) => {
+  const email = req.query.email; // logged-in user email
+  try {
+    const orders = await ordersCollection.find({ buyerEmail: email }).toArray();
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Failed to fetch orders" });
+  }
+});
 
-    //     //  Update or create user profile
-    //  app.put("/user/update-profile/:email", async (req, res) => {
-    //   const email = req.params.email;
-    //   const updatedData = req.body;
 
-    //   if (!updatedData || typeof updatedData !== "object") {
-    //     return res.status(400).json({ error: "Invalid profile data" });
-    //   }
-
-    //   const result = await usersCollection.updateOne(
-    //     { email },
-    //     { $set: updatedData },
-    //     { upsert: true }
-    //   );
-    //   res.json(result);
-    // });
 
     app.get("/myproduct", async (req, res) => {
       console.log(req.query);
@@ -103,23 +103,20 @@ async function run() {
     app.get("/products/product-details/:id", async (req, res) => {
       try {
         const id = req.params.id;
+        console.log(req.params.id);
+        if (!ObjectId.isValid(id))
+          return res.status(400).json({ error: "Invalid product ID" });
 
-        // Validate ObjectId before using
-        if (!ObjectId.isValid(id)) {
-          return res.status(400).send({ error: "Invalid product ID format" });
-        }
+        const product = await productsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        if (!product)
+          return res.status(404).json({ error: "Product not found" });
 
-        const query = { _id: new ObjectId(id) };
-        const product = await productsCollection.findOne(query);
-
-        if (!product) {
-          return res.status(404).send({ error: "Product not found" });
-        }
-
-        res.send(product);
-      } catch (error) {
-        console.error("Error fetching product details:", error);
-        res.status(500).send({ error: "Internal Server Error" });
+        res.json(product);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal Server Error" });
       }
     });
 
@@ -136,7 +133,14 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/products/:id", async (req, res) => {
+    app.get("/my-listings", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await productsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.put("/products/:id", async (req, res) => {
       const id = req.params.id;
       const updatedProduct = req.body;
       const query = { _id: new ObjectId(id) };
