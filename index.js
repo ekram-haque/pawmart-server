@@ -27,7 +27,7 @@ app.get("/", (req, res) => {
 
 async function run() {
   try {
-    // await client.connect();
+    await client.connect();
 
     const db = client.db("pawmart_db");
     const productsCollection = db.collection("products");
@@ -172,6 +172,6 @@ app.get("/my-orders", async (req, res) => {
 
 run().catch(console.dir);
 
-app.listen(port, () => {
-  console.log(` pawmart server is running on port ${port}`);
-});
+// app.listen(port, () => {
+//   console.log(` pawmart server is running on port ${port}`);
+// });
