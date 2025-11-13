@@ -71,14 +71,11 @@ async function run() {
   });
 
   app.get("/products/category-filtered-product/:category", async (req, res) => {
-  const category = req.params.category.trim().toLowerCase();
-  const query = { 
-    category: { $regex: new RegExp(`^${category}$`, "i") } 
-  };
-  const result = await productsCollection.find(query).sort({ date: -1 }).toArray();
-  res.send(result);
-});
-
+    const category = req.params.category.trim().toLowerCase();
+    const query = category ? { category } : {};
+    const result = await productsCollection.find(query).sort({ date: -1 }).toArray();
+    res.send(result);
+  });
 
   app.get("/products", async (req, res) => {
     const email = req.query.email;
