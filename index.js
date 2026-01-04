@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5174", "https://paw-mart.pages.dev"],
+    origin: ["http://localhost:5173", "https://paw-mart.pages.dev"],
 
     credentials: true,
   })
@@ -16,21 +16,6 @@ app.use(
 // Mongo URI
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.gab2mh0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Global cached client (Vercel Requirement)
-let client;
-let clientPromise;
-
-if (!clientPromise) {
-  client = new MongoClient(uri, {
-    serverApi: {
-      version: ServerApiVersion.v1,
-      strict: true,
-      deprecationErrors: true,
-    },
-  });
-
-  clientPromise = client.connect();
-}
 
 // Root route
 app.get("/", async (req, res) => {
@@ -39,8 +24,14 @@ app.get("/", async (req, res) => {
 
 // MAIN FUNCTION
 async function run() {
-  const con = await clientPromise;
-
+  // const con = await clientPromise;
+  const con = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    },
+  });
   const db = con.db("pawmart_db");
   const productsCollection = db.collection("products");
   const myProductCollection = db.collection("myProduct");
@@ -49,36 +40,41 @@ async function run() {
 
   // ----------------------- ROUTES -------------------------
 
-  app.get("/users/:email", async (req, res) => {
-    const email = req.params.email;
-    const user = await usersCollection.findOne({ email });
-    res.send(user);
-  });
+app.get("/users/:email", async (req, res) => {
+  const email = req.params.email;
+  const user = await usersCollection.findOne({ email });
 
-  app.put("/users", async (req, res) => {
-    const user = req.body;
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
-    const result = await usersCollection.updateOne(
-      { email: user.email },
-      {
-        $setOnInsert: {
-          role: "user",
-          bio: "",
-          location: "",
-          joinDate: new Date(),
-        },
-        $set: {
-          uid: user.uid,
-          name: user.name,
-          photoURL: user.photoURL,
-        },
+  res.send(user);
+});
+
+
+app.put("/users", async (req, res) => {
+  const user = req.body;
+
+  const result = await usersCollection.updateOne(
+    { email: user.email },
+    {
+      $setOnInsert: {
+        role: "user",
+        bio: "",
+        location: "",
+        joinDate: new Date(),
       },
-      { upsert: true }
-    );
+      $set: {
+        uid: user.uid,
+        name: user.name,
+        photoURL: user.photoURL,
+      },
+    },
+    { upsert: true }
+  );
 
-    res.send(result);
-  });
-
+  res.send(result);
+});
   app.put("/user/update-profile/:email", async (req, res) => {
     const email = req.params.email;
     const updateData = req.body;
@@ -119,7 +115,7 @@ async function run() {
     }
   });
 
-  app.get("/myproduct", async (req, res) => {
+  app.get("/my-product", async (req, res) => {
     const email = req.query.email;
     const query = email ? { email } : {};
     const result = await myProductCollection
@@ -129,7 +125,7 @@ async function run() {
     res.send(result);
   });
 
-  app.get("/products/category-product/:category", async (req, res) => {
+  app.get("/category-product/:category", async (req, res) => {
     const categoryParam = req.params.category.trim();
     const query = { category: { $regex: `^${categoryParam}$`, $options: "i" } }; // case-insensitive exact match
     try {
@@ -154,7 +150,7 @@ async function run() {
     res.send(result);
   });
 
-  app.get("/products/product-details/:id", async (req, res) => {
+  app.get("/product-details/:id", async (req, res) => {
     const id = req.params.id;
     if (!ObjectId.isValid(id))
       return res.status(400).json({ error: "Invalid product ID" });
@@ -218,7 +214,7 @@ async function run() {
           category: category,
           _id: { $ne: new ObjectId(id) }, // exclude current product
         })
-        .limit(3)
+        .limit(4)
         .toArray();
 
       res.json(relatedProducts);
@@ -229,10 +225,14 @@ async function run() {
         .json({ message: "Server error fetching related products" });
     }
   });
+
+ 
+
 }
 
 
 run().catch(console.error);
+module.exports = app;
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
